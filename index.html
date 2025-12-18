@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualización K-Medias - Análisis de retrasos de vuelos</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .menu-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .menu-item {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .menu-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+            border-color: #667eea;
+        }
+
+        .menu-item.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+
+        .menu-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .menu-item h3 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .menu-item p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        #graph-container {
+            display: none;
+            padding: 40px;
+        }
+
+        #graph-container.active {
+            display: block;
+        }
+
+        #plot {
+            width: 100%;
+            height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .back-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .back-button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .legend-info {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .menu-container {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+
+            #graph-container {
+                padding: 20px;
+            }
+
+            #plot {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Análisis K-Medias de retrasos de vuelos</h1>
+            <p class="subtitle">Ejercicio 2 de la práctica 5 - Minería de Datos</p>
+        </header>
+
+        <div id="menu" class="menu-container">
+            <div class="menu-item" onclick="mostrarGrafica('aeropuerto_origen')">
+                <div class="menu-icon">🛫</div>
+                <h3>Aeropuerto origen</h3>
+                <p>Clasificación por retraso medio de aeropuertos de origen</p>
+            </div>
+
+            <div class="menu-item" onclick="mostrarGrafica('aeropuerto_destino')">
+                <div class="menu-icon">🛬</div>
+                <h3>Aeropuerto destino</h3>
+                <p>Clasificación por retraso medio de aeropuertos de destino</p>
+            </div>
+
+            <div class="menu-item" onclick="mostrarGrafica('aerolinea')">
+                <div class="menu-icon">🧑‍✈️</div>
+                <h3>Aerolínea</h3>
+                <p>Clasificación por retraso medio de aerolíneas</p>
+            </div>
+
+            <div class="menu-item" onclick="mostrarGrafica('modelo_avion')">
+                <div class="menu-icon">📏</div>
+                <h3>Modelo de Avión</h3>
+                <p>Clasificación por retraso medio de modelos de avión</p>
+            </div>
+        </div>
+
+        <div id="graph-container">
+            <button class="back-button" onclick="volverMenu()">← Volver al Menú</button>
+            <div id="plot"></div>
+            
+            <div class="legend-info">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #22c55e;"></div>
+                    <span><strong>Retraso bajo</strong></span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eab308;"></div>
+                    <span><strong>Retraso moderado</strong></span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ef4444;"></div>
+                    <span><strong>Retraso alto</strong></span>
+                </div>
+            </div>
+
+            <div id="stats" class="stats-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let datosKmeans = null;
+
+        // Cargar datos al iniciar
+        fetch('datos_kmeans.json')
+            .then(response => response.json())
+            .then(data => {
+                datosKmeans = data;
+                console.log('Datos cargados correctamente:', datosKmeans);
+            })
+            .catch(error => {
+                console.error('Error al cargar datos:', error);
+                alert('Error al cargar los datos. Asegúrate de ejecutar primero Ejercicio2.R');
+            });
+
+        function mostrarGrafica(tipo) {
+            if (!datosKmeans) {
+                alert('Los datos aún no se han cargado. Por favor, espera un momento.');
+                return;
+            }
+
+            const menu = document.getElementById('menu');
+            const graphContainer = document.getElementById('graph-container');
+            
+            menu.style.display = 'none';
+            graphContainer.classList.add('active');
+
+            const titulos = {
+                'aeropuerto_origen': 'Clasificación de aeropuertos de origen por retraso medio',
+                'aeropuerto_destino': 'Clasificación de aeropuertos de destino por retraso medio',
+                'aerolinea': 'Clasificación de aerolíneas por retraso medio',
+                'modelo_avion': 'Clasificación de modelos de avión por retraso medio'
+            };
+
+            const datos = datosKmeans[tipo].datos;
+            
+            // Preparar datos por grupo
+            const grupos = {
+                'Retraso bajo': { color: '#22c55e', indices: [], retrasos: [], nombres: [] },
+                'Retraso moderado': { color: '#eab308', indices: [], retrasos: [], nombres: [] },
+                'Retraso alto': { color: '#ef4444', indices: [], retrasos: [], nombres: [] }
+            };
+
+            datos.forEach(item => {
+                if (grupos[item.grupo]) {
+                    grupos[item.grupo].indices.push(item.indice);
+                    grupos[item.grupo].retrasos.push(item.retrasoMedio);
+                    grupos[item.grupo].nombres.push(item.nombre);
+                }
+            });
+
+            // Crear trazas para Plotly
+            const traces = [];
+            Object.keys(grupos).forEach(grupo => {
+                if (grupos[grupo].indices.length > 0) {
+                    traces.push({
+                        x: grupos[grupo].indices,
+                        y: grupos[grupo].retrasos,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: grupo,
+                        marker: {
+                            color: grupos[grupo].color,
+                            size: 12,
+                            line: {
+                                color: '#333',
+                                width: 1
+                            }
+                        },
+                        text: grupos[grupo].nombres.map((nombre, i) => 
+                            `<b>${nombre}</b><br>` +
+                            `Retraso: ${grupos[grupo].retrasos[i]} min<br>` +
+                            `Grupo: ${grupo}`
+                        ),
+                        hovertemplate: '%{text}<extra></extra>'
+                    });
+                }
+            });
+
+            // Layout del gráfico
+            const layout = {
+                title: {
+                    text: titulos[tipo],
+                    font: { size: 20, color: '#1e3c72' }
+                },
+                xaxis: {
+                    title: 'Índice',
+                    gridcolor: '#e5e7eb',
+                    showgrid: true
+                },
+                yaxis: {
+                    title: 'Retraso Medio (minutos)',
+                    gridcolor: '#e5e7eb',
+                    showgrid: true
+                },
+                plot_bgcolor: '#fefefe',
+                paper_bgcolor: '#ffffff',
+                hovermode: 'closest',
+                showlegend: true,
+                legend: {
+                    x: 1,
+                    y: 1,
+                    xanchor: 'right',
+                    bgcolor: 'rgba(255, 255, 255, 0.9)',
+                    bordercolor: '#e5e7eb',
+                    borderwidth: 1
+                }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+            };
+
+            Plotly.newPlot('plot', traces, layout, config);
+
+            // Mostrar estadísticas
+            mostrarEstadisticas(datos);
+        }
+
+        function mostrarEstadisticas(datos) {
+            const statsContainer = document.getElementById('stats');
+            
+            const total = datos.length;
+            const retrasoPromedio = (datos.reduce((sum, d) => sum + d.retrasoMedio, 0) / total).toFixed(2);
+            const retrasoMax = Math.max(...datos.map(d => d.retrasoMedio)).toFixed(2);
+            const retrasoMin = Math.min(...datos.map(d => d.retrasoMedio)).toFixed(2);
+            
+            const bajos = datos.filter(d => d.grupo === 'Retraso bajo').length;
+            const moderados = datos.filter(d => d.grupo === 'Retraso moderado').length;
+            const altos = datos.filter(d => d.grupo === 'Retraso alto').length;
+
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">Total de entidades</div>
+                    <div class="stat-value">${total}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Retraso promedio</div>
+                    <div class="stat-value">${retrasoPromedio} min</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Retraso máximo</div>
+                    <div class="stat-value">${retrasoMax} min</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Retraso mínimo</div>
+                    <div class="stat-value">${retrasoMin} min</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);">
+                    <div class="stat-label">Retraso bajo</div>
+                    <div class="stat-value" style="color: #059669;">${bajos}</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                    <div class="stat-label">Retraso moderado</div>
+                    <div class="stat-value" style="color: #d97706;">${moderados}</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                    <div class="stat-label">Retraso alto</div>
+                    <div class="stat-value" style="color: #dc2626;">${altos}</div>
+                </div>
+            `;
+        }
+
+        function volverMenu() {
+            const menu = document.getElementById('menu');
+            const graphContainer = document.getElementById('graph-container');
+            
+            graphContainer.classList.remove('active');
+            menu.style.display = 'grid';
+        }
+    </script>
+</body>
+</html>
